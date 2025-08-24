@@ -6,10 +6,7 @@ The official TypeScript SDK for seamlessly integrating AgentVine's AI-powered of
 
 - **Type-Safe Integration** - Full TypeScript support with comprehensive type definitions
 - **AI-Powered Matching** - Smart offer matching based on user queries and context
-- **Automatic Connection Verification** - SDK automatically verifies agent credentials on startup
-- **Background Health Monitoring** - Silent background health checks every 30 seconds
-- **Connection Status Tracking** - Real-time connection status and error reporting
-- **Secure Authentication** - API key-based authentication with secure token management
+- **Secure Authentication** - Agent-based authentication with secure credential management
 - **Framework Agnostic** - Works with any JavaScript/TypeScript framework
 - **Lightweight** - Minimal dependencies with efficient performance
 
@@ -34,9 +31,7 @@ import { AgentVineClient } from 'agentvine';
 // Initialize with your agent credentials from the dashboard
 const client = new AgentVineClient({
   agentId: 'your_agent_id',
-  agentSecretKey: 'your_secret_key',
-  // Optional: specify environment
-  environment: 'production' // 'production' | 'development' | 'local'
+  agentSecretKey: 'your_secret_key'
 });
 
 // Get relevant offers for user queries
@@ -81,17 +76,8 @@ new AgentVineClient(config: AgentVineConfig)
 **Parameters:**
 - `config.agentId` (string, required) - Your agent ID from AgentVine dashboard
 - `config.agentSecretKey` (string, required) - Your agent secret key
-- `config.environment` (string, optional) - Environment: 'production' (default), 'development', or 'local'
-- `config.baseUrl` (string, optional) - Custom API base URL (overrides environment setting)
 - `config.timeout` (number, optional) - Request timeout in milliseconds (defaults to 10000)
-- `config.autoVerify` (boolean, optional) - Auto-verify connection on initialization (default: true)
-- `config.onConnectionVerified` (function, optional) - Callback when connection is verified
-- `config.onConnectionFailed` (function, optional) - Callback when connection fails
 
-**Environment URLs:**
-- `production`: https://api.agentvine.dev (default)
-- `development`: https://dev-api.agentvine.dev  
-- `local`: http://localhost:3001
 
 #### Methods
 
@@ -134,29 +120,6 @@ Test your agent credentials and connection.
 async testConnection(): Promise<TestConnectionResult>
 ```
 
-##### getConnectionStatus()
-
-Get current connection status and agent information.
-
-```typescript
-getConnectionStatus(): { isConnected: boolean; agent: any | null; error: SDKError | null }
-```
-
-##### isReady()
-
-Check if SDK is connected and ready to make requests.
-
-```typescript
-isReady(): boolean
-```
-
-##### destroy()
-
-Stop background health checks and cleanup resources.
-
-```typescript
-destroy(): void
-```
 
 **Returns:**
 ```typescript
@@ -240,8 +203,7 @@ import { AgentVineClient } from 'agentvine';
 
 const client = new AgentVineClient({
   agentId: process.env.AGENTVINE_AGENT_ID!,
-  agentSecretKey: process.env.AGENTVINE_SECRET_KEY!,
-  environment: process.env.NODE_ENV as 'development' | 'production'
+  agentSecretKey: process.env.AGENTVINE_SECRET_KEY!
 });
 
 export default async function handler(
@@ -479,73 +441,26 @@ const response: OfferResponse = await client.getOffers(request);
 
 - **Secure Communication**: All API calls use HTTPS and authenticated requests
 - **Privacy First**: No personal user data is sent to AgentVine - only query content and session IDs
-- **Background Health Monitoring**: Silent connection verification every 30 seconds
-- **Connection Status Tracking**: Real-time monitoring of agent connectivity
 
 ## 🔧 Configuration Options
 
-### Environment Configuration
+### Basic Configuration
 
 ```typescript
-// Production environment (default)
+// Basic client setup
 const client = new AgentVineClient({
   agentId: 'your_agent_id',
-  agentSecretKey: 'your_secret_key',
-  environment: 'production' // Uses https://api.agentvine.dev
+  agentSecretKey: 'your_secret_key'
 });
 
-// Development environment
-const devClient = new AgentVineClient({
+// With custom timeout
+const customClient = new AgentVineClient({
   agentId: 'your_agent_id',
   agentSecretKey: 'your_secret_key',
-  environment: 'development' // Uses https://dev-api.agentvine.dev
-});
-
-// Local development
-const localClient = new AgentVineClient({
-  agentId: 'your_agent_id',
-  agentSecretKey: 'your_secret_key',
-  environment: 'local' // Uses http://localhost:3001
-});
-
-// With connection callbacks
-const monitoredClient = new AgentVineClient({
-  agentId: 'your_agent_id',
-  agentSecretKey: 'your_secret_key',
-  timeout: 15000,
-  onConnectionVerified: (agent) => {
-    console.log('Connected as:', agent.name);
-  },
-  onConnectionFailed: (error) => {
-    console.error('Connection failed:', error.message);
-  }
+  timeout: 15000 // 15 seconds
 });
 ```
 
-### Connection Management
-
-```typescript
-// Monitor connection status
-const client = new AgentVineClient({
-  agentId: 'your_agent_id',
-  agentSecretKey: 'your_secret_key',
-  onConnectionVerified: (agent) => {
-    console.log(`✅ Connected as: ${agent.name}`);
-  },
-  onConnectionFailed: (error) => {
-    console.error(`❌ Connection failed: ${error.message}`);
-  }
-});
-
-// Check connection status anytime
-const status = client.getConnectionStatus();
-console.log('Connected:', status.isConnected);
-console.log('Agent:', status.agent?.name);
-console.log('Error:', status.error?.message);
-
-// Cleanup when done
-client.destroy();
-```
 
 ## 🛡 Security Best Practices
 
@@ -593,11 +508,6 @@ const offers = await client.getOffers({
 
 ## 📚 Resources and Support
 
-### Documentation
-- **[Developer Portal](https://developers.agentvine.com)** - Complete API documentation
-- **[Dashboard](https://dashboard.agentvine.com)** - Agent management and analytics
-- **[Getting Started Guide](https://docs.agentvine.com/quickstart)** - Step-by-step setup
-
 ### Community and Support
 - **[GitHub Issues](https://github.com/rishirebel/agentvine/issues)** - Bug reports and feature requests
 - **[npm Package](https://www.npmjs.com/package/agentvine)** - Latest releases
@@ -605,14 +515,6 @@ const offers = await client.getOffers({
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
-- Code of conduct
-- Development setup
-- Pull request process
-- Testing requirements
 
 ---
 
