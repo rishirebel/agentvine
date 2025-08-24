@@ -1,0 +1,40 @@
+{
+  "name": "agentvine",
+  "version": "1.0.0",
+  "description": "AgentVine SDK for integrating sponsored content and monetizing AI agents",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build",
+    "test": "jest"
+  },
+  "keywords": [
+    "agentvine",
+    "ai",
+    "monetization",
+    "sponsored-content",
+    "sdk",
+    "advertising"
+  ],
+  "author": "Rishikesh Chandra",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentvine/sdk"
+  },
+  "homepage": "https://agentvine.ai",
+  "dependencies": {
+    "cross-fetch": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
