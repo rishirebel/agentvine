@@ -15,6 +15,11 @@ import {
 export class AgentVineClient {
   private config: AgentVineConfig;
   private baseUrl: string;
+  private isConnected: boolean = false;
+  private connectionError: SDKError | null = null;
+  private agent: any = null;
+  private healthCheckInterval: NodeJS.Timeout | null = null;
+  private lastHealthCheck: Date | null = null;
 
   constructor(config: AgentVineConfig) {
     this.config = config;
@@ -39,6 +44,142 @@ export class AgentVineClient {
     
     if (!config.agentId || !config.agentSecretKey) {
       throw new Error('AgentVine SDK: agentId and agentSecretKey are required');
+    }
+
+    // Auto-verify connection by default (unless explicitly disabled)
+    if (config.autoVerify !== false) {
+      this.verifyConnection();
+    }
+
+    // Start background health check (runs every 30 seconds)
+    this.startHealthCheck();
+  }
+
+  /**
+   * Automatically verify connection on initialization
+   */
+  private async verifyConnection(): Promise<void> {
+    try {
+      const result = await this.testConnection();
+      if (result.success && result.agent) {
+        this.isConnected = true;
+        this.agent = result.agent;
+        this.connectionError = null;
+        
+        console.log(`✅ AgentVine: Connected successfully as "${result.agent.name}" (ID: ${result.agent.id})`);
+        
+        // Call success callback if provided
+        if (this.config.onConnectionVerified) {
+          this.config.onConnectionVerified(result.agent);
+        }
+      } else {
+        throw new Error(result.message || 'Connection verification failed');
+      }
+    } catch (error: any) {
+      this.isConnected = false;
+      this.connectionError = {
+        code: 'CONNECTION_FAILED',
+        message: error.message || 'Failed to verify agent credentials',
+        details: error
+      };
+      
+      console.error('❌ AgentVine: Connection verification failed:', this.connectionError.message);
+      
+      // Call failure callback if provided
+      if (this.config.onConnectionFailed) {
+        this.config.onConnectionFailed(this.connectionError);
+      }
+    }
+  }
+
+  /**
+   * Get connection status
+   */
+  public getConnectionStatus(): { isConnected: boolean; agent: any | null; error: SDKError | null } {
+    return {
+      isConnected: this.isConnected,
+      agent: this.agent,
+      error: this.connectionError
+    };
+  }
+
+  /**
+   * Check if SDK is connected
+   */
+  public isReady(): boolean {
+    return this.isConnected;
+  }
+
+  /**
+   * Start background health check (runs every 30 seconds)
+   * This is completely invisible to the user
+   */
+  private startHealthCheck(): void {
+    // Clear any existing interval
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+    }
+
+    // Run health check every 30 seconds
+    this.healthCheckInterval = setInterval(async () => {
+      await this.performHealthCheck();
+    }, 30000); // 30 seconds
+
+    // Also run an initial health check after 1 second
+    setTimeout(() => this.performHealthCheck(), 1000);
+  }
+
+  /**
+   * Perform silent health check
+   */
+  private async performHealthCheck(): Promise<void> {
+    try {
+      // Make a lightweight API call to verify connection
+      const response = await this.makeRequest('/api/sdk/test', {
+        method: 'POST',
+        body: JSON.stringify({
+          query: 'health-check',
+          sessionId: `health-${Date.now()}`,
+          context: 'background-health-check'
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        this.isConnected = true;
+        this.connectionError = null;
+        this.lastHealthCheck = new Date();
+        
+        // Update agent info if changed
+        if (data.agent) {
+          this.agent = data.agent;
+        }
+      } else {
+        this.isConnected = false;
+        this.connectionError = {
+          code: 'HEALTH_CHECK_FAILED',
+          message: 'Background health check failed',
+          details: { status: response.status, statusText: response.statusText }
+        };
+      }
+    } catch (error: any) {
+      // Silently handle errors - no console output
+      this.isConnected = false;
+      this.connectionError = {
+        code: 'HEALTH_CHECK_ERROR',
+        message: error.message || 'Health check error',
+        details: error
+      };
+    }
+  }
+
+  /**
+   * Stop health check (for cleanup)
+   */
+  public destroy(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
     }
   }
 

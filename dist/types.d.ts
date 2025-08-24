@@ -4,6 +4,9 @@ export interface AgentVineConfig {
     baseUrl?: string;
     environment?: 'production' | 'development' | 'local';
     timeout?: number;
+    autoVerify?: boolean;
+    onConnectionVerified?: (agent: any) => void;
+    onConnectionFailed?: (error: SDKError) => void;
 }
 export interface OfferRequest {
     query: string;

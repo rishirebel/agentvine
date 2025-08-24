@@ -7,6 +7,11 @@ exports.AgentVineClient = void 0;
 const cross_fetch_1 = __importDefault(require("cross-fetch"));
 class AgentVineClient {
     constructor(config) {
+        this.isConnected = false;
+        this.connectionError = null;
+        this.agent = null;
+        this.healthCheckInterval = null;
+        this.lastHealthCheck = null;
         this.config = config;
         if (config.baseUrl) {
             this.baseUrl = config.baseUrl;
@@ -27,6 +32,101 @@ class AgentVineClient {
         }
         if (!config.agentId || !config.agentSecretKey) {
             throw new Error('AgentVine SDK: agentId and agentSecretKey are required');
+        }
+        if (config.autoVerify !== false) {
+            this.verifyConnection();
+        }
+        this.startHealthCheck();
+    }
+    async verifyConnection() {
+        try {
+            const result = await this.testConnection();
+            if (result.success && result.agent) {
+                this.isConnected = true;
+                this.agent = result.agent;
+                this.connectionError = null;
+                console.log(`✅ AgentVine: Connected successfully as "${result.agent.name}" (ID: ${result.agent.id})`);
+                if (this.config.onConnectionVerified) {
+                    this.config.onConnectionVerified(result.agent);
+                }
+            }
+            else {
+                throw new Error(result.message || 'Connection verification failed');
+            }
+        }
+        catch (error) {
+            this.isConnected = false;
+            this.connectionError = {
+                code: 'CONNECTION_FAILED',
+                message: error.message || 'Failed to verify agent credentials',
+                details: error
+            };
+            console.error('❌ AgentVine: Connection verification failed:', this.connectionError.message);
+            if (this.config.onConnectionFailed) {
+                this.config.onConnectionFailed(this.connectionError);
+            }
+        }
+    }
+    getConnectionStatus() {
+        return {
+            isConnected: this.isConnected,
+            agent: this.agent,
+            error: this.connectionError
+        };
+    }
+    isReady() {
+        return this.isConnected;
+    }
+    startHealthCheck() {
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+        }
+        this.healthCheckInterval = setInterval(async () => {
+            await this.performHealthCheck();
+        }, 30000);
+        setTimeout(() => this.performHealthCheck(), 1000);
+    }
+    async performHealthCheck() {
+        try {
+            const response = await this.makeRequest('/api/sdk/test', {
+                method: 'POST',
+                body: JSON.stringify({
+                    query: 'health-check',
+                    sessionId: `health-${Date.now()}`,
+                    context: 'background-health-check'
+                })
+            });
+            if (response.ok) {
+                const data = await response.json();
+                this.isConnected = true;
+                this.connectionError = null;
+                this.lastHealthCheck = new Date();
+                if (data.agent) {
+                    this.agent = data.agent;
+                }
+            }
+            else {
+                this.isConnected = false;
+                this.connectionError = {
+                    code: 'HEALTH_CHECK_FAILED',
+                    message: 'Background health check failed',
+                    details: { status: response.status, statusText: response.statusText }
+                };
+            }
+        }
+        catch (error) {
+            this.isConnected = false;
+            this.connectionError = {
+                code: 'HEALTH_CHECK_ERROR',
+                message: error.message || 'Health check error',
+                details: error
+            };
+        }
+    }
+    destroy() {
+        if (this.healthCheckInterval) {
+            clearInterval(this.healthCheckInterval);
+            this.healthCheckInterval = null;
         }
     }
     async getOffers(request) {

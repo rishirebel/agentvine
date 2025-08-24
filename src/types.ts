@@ -9,6 +9,9 @@ export interface AgentVineConfig {
   baseUrl?: string;
   environment?: 'production' | 'development' | 'local';
   timeout?: number;
+  autoVerify?: boolean; // Auto-verify connection on initialization (default: true)
+  onConnectionVerified?: (agent: any) => void; // Callback when connection is verified
+  onConnectionFailed?: (error: SDKError) => void; // Callback when connection fails
 }
 
 export interface OfferRequest {

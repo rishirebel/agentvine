@@ -6,31 +6,33 @@ The official TypeScript SDK for seamlessly integrating AgentVine's AI-powered of
 
 - **Type-Safe Integration** - Full TypeScript support with comprehensive type definitions
 - **AI-Powered Matching** - Smart offer matching based on user queries and context
-- **Real-Time Analytics** - Automatic performance tracking and revenue optimization
+- **Automatic Connection Verification** - SDK automatically verifies agent credentials on startup
+- **Background Health Monitoring** - Silent background health checks every 30 seconds
+- **Connection Status Tracking** - Real-time connection status and error reporting
 - **Secure Authentication** - API key-based authentication with secure token management
 - **Framework Agnostic** - Works with any JavaScript/TypeScript framework
-- **Zero Dependencies** - Lightweight SDK with minimal footprint
+- **Lightweight** - Minimal dependencies with efficient performance
 
 ## 📦 Installation
 
 ```bash
 # npm
-npm install @agentvine/sdk
+npm install agentvine
 
 # yarn  
-yarn add @agentvine/sdk
+yarn add agentvine
 
 # pnpm
-pnpm add @agentvine/sdk
+pnpm add agentvine
 ```
 
 ## ⚡ Quick Start
 
 ```typescript
-import { AgentVineSDK } from '@agentvine/sdk';
+import { AgentVineClient } from 'agentvine';
 
 // Initialize with your agent credentials from the dashboard
-const sdk = new AgentVineClient({
+const client = new AgentVineClient({
   agentId: 'your_agent_id',
   agentSecretKey: 'your_secret_key',
   // Optional: specify environment
@@ -40,20 +42,17 @@ const sdk = new AgentVineClient({
 // Get relevant offers for user queries
 async function handleUserQuery(userQuery: string, sessionId: string) {
   try {
-    const response = await sdk.getOffers({
+    const response = await client.getOffers({
       query: userQuery,
       sessionId: sessionId,
-      context: {
-        userType: 'developer',
-        platform: 'web'
-      }
+      context: 'development platform: web'
     });
     
     // Display offers to users
     response.offers.forEach(offer => {
       console.log(`✨ ${offer.title}`);
       console.log(`📝 ${offer.description}`);
-      console.log(`🔗 ${offer.callToAction} -> ${offer.actionUrl}`);
+      console.log(`🔗 ${offer.callToAction} -> ${offer.actionEndpoint}`);
     });
     
     return response.offers;
@@ -64,7 +63,7 @@ async function handleUserQuery(userQuery: string, sessionId: string) {
 }
 
 // Test your integration
-sdk.testConnection()
+client.testConnection()
   .then(result => console.log('✅ Connected to AgentVine:', result.agent?.name))
   .catch(error => console.error('❌ Connection failed:', error.message));
 ```
@@ -85,6 +84,9 @@ new AgentVineClient(config: AgentVineConfig)
 - `config.environment` (string, optional) - Environment: 'production' (default), 'development', or 'local'
 - `config.baseUrl` (string, optional) - Custom API base URL (overrides environment setting)
 - `config.timeout` (number, optional) - Request timeout in milliseconds (defaults to 10000)
+- `config.autoVerify` (boolean, optional) - Auto-verify connection on initialization (default: true)
+- `config.onConnectionVerified` (function, optional) - Callback when connection is verified
+- `config.onConnectionFailed` (function, optional) - Callback when connection fails
 
 **Environment URLs:**
 - `production`: https://api.agentvine.dev (default)
@@ -132,6 +134,30 @@ Test your agent credentials and connection.
 async testConnection(): Promise<TestConnectionResult>
 ```
 
+##### getConnectionStatus()
+
+Get current connection status and agent information.
+
+```typescript
+getConnectionStatus(): { isConnected: boolean; agent: any | null; error: SDKError | null }
+```
+
+##### isReady()
+
+Check if SDK is connected and ready to make requests.
+
+```typescript
+isReady(): boolean
+```
+
+##### destroy()
+
+Stop background health checks and cleanup resources.
+
+```typescript
+destroy(): void
+```
+
 **Returns:**
 ```typescript
 {
@@ -152,11 +178,11 @@ async testConnection(): Promise<TestConnectionResult>
 
 ```typescript
 import React, { useState, useEffect } from 'react';
-import { AgentVineSDK, Offer } from '@agentvine/sdk';
+import { AgentVineClient, Offer } from 'agentvine';
 
-const sdk = new AgentVineSDK({
-  apiKey: process.env.REACT_APP_AGENTVINE_API_KEY!,
-  secretKey: process.env.REACT_APP_AGENTVINE_SECRET_KEY!
+const client = new AgentVineClient({
+  agentId: process.env.REACT_APP_AGENTVINE_AGENT_ID!,
+  agentSecretKey: process.env.REACT_APP_AGENTVINE_SECRET_KEY!
 });
 
 function ChatComponent() {
@@ -168,24 +194,15 @@ function ChatComponent() {
     const sessionId = `chat-${userId}-${Date.now()}`;
     
     try {
-      const response = await sdk.getOffers({
+      const response = await client.getOffers({
         query: message,
         sessionId,
-        context: { 
-          userType: 'end_user',
-          platform: 'web',
-          chatContext: 'assistance' 
-        }
+        context: 'user assistance chat on web platform'
       });
       
       setOffers(response.offers);
       
-      // Track impression automatically handled by SDK
-      await sdk.trackImpression({
-        offerId: response.offers[0]?.id,
-        sessionId,
-        placement: 'chat_sidebar'
-      });
+      // Note: Impressions are automatically tracked by AgentVine
       
     } catch (error) {
       console.error('Failed to get offers:', error);
@@ -202,10 +219,10 @@ function ChatComponent() {
           <OfferCard 
             key={offer.id} 
             offer={offer}
-            onInteraction={() => sdk.trackClick({
-              offerId: offer.id,
-              sessionId: 'current-session'
-            })}
+            onInteraction={() => {
+              // Handle offer interaction
+              window.open(offer.actionEndpoint, '_blank');
+            }}
           />
         ))}
       </div>
@@ -219,11 +236,11 @@ function ChatComponent() {
 ```typescript
 // pages/api/agent/offers.ts
 import { NextApiRequest, NextApiResponse } from 'next';
-import { AgentVineSDK } from '@agentvine/sdk';
+import { AgentVineClient } from 'agentvine';
 
-const sdk = new AgentVineSDK({
-  apiKey: process.env.AGENTVINE_API_KEY!,
-  secretKey: process.env.AGENTVINE_SECRET_KEY!,
+const client = new AgentVineClient({
+  agentId: process.env.AGENTVINE_AGENT_ID!,
+  agentSecretKey: process.env.AGENTVINE_SECRET_KEY!,
   environment: process.env.NODE_ENV as 'development' | 'production'
 });
 
@@ -238,14 +255,10 @@ export default async function handler(
   const { query, sessionId, context } = req.body;
 
   try {
-    const offersResponse = await sdk.getOffers({
+    const offersResponse = await client.getOffers({
       query,
       sessionId,
-      context: {
-        userAgent: req.headers['user-agent'],
-        referrer: req.headers.referer,
-        ...context
-      }
+      context: `${context} - User-Agent: ${req.headers['user-agent']}`
     });
 
     res.status(200).json(offersResponse);
@@ -263,13 +276,13 @@ export default async function handler(
 
 ```typescript
 import express from 'express';
-import { AgentVineSDK } from '@agentvine/sdk';
+import { AgentVineClient } from 'agentvine';
 import OpenAI from 'openai';
 
 const app = express();
-const sdk = new AgentVineSDK({
-  apiKey: process.env.AGENTVINE_API_KEY!,
-  secretKey: process.env.AGENTVINE_SECRET_KEY!
+const client = new AgentVineClient({
+  agentId: process.env.AGENTVINE_AGENT_ID!,
+  agentSecretKey: process.env.AGENTVINE_SECRET_KEY!
 });
 
 const openai = new OpenAI({
@@ -288,14 +301,10 @@ app.post('/api/chat', async (req, res) => {
     });
 
     // Get relevant sponsored offers
-    const offersResponse = await sdk.getOffers({
+    const offersResponse = await client.getOffers({
       query: message,
       sessionId,
-      context: {
-        userType: 'chat_user',
-        platform: 'web_api',
-        aiModel: 'gpt-4'
-      }
+      context: 'chat user on web API using gpt-4'
     });
 
     // Enhanced response with AI + sponsored content
@@ -324,12 +333,12 @@ app.listen(3000, () => {
 
 ```typescript
 // composables/useAgentVine.ts
-import { ref, reactive } from 'vue';
-import { AgentVineSDK, type Offer, type GetOffersRequest } from '@agentvine/sdk';
+import { ref } from 'vue';
+import { AgentVineClient, type Offer, type OfferRequest } from 'agentvine';
 
-const sdk = new AgentVineSDK({
-  apiKey: import.meta.env.VITE_AGENTVINE_API_KEY,
-  secretKey: import.meta.env.VITE_AGENTVINE_SECRET_KEY
+const client = new AgentVineClient({
+  agentId: import.meta.env.VITE_AGENTVINE_AGENT_ID,
+  agentSecretKey: import.meta.env.VITE_AGENTVINE_SECRET_KEY
 });
 
 export function useAgentVine() {
@@ -337,12 +346,12 @@ export function useAgentVine() {
   const loading = ref(false);
   const error = ref<string | null>(null);
 
-  const getOffers = async (request: GetOffersRequest) => {
+  const getOffers = async (request: OfferRequest) => {
     loading.value = true;
     error.value = null;
     
     try {
-      const response = await sdk.getOffers(request);
+      const response = await client.getOffers(request);
       offers.value = response.offers;
       return response;
     } catch (err: any) {
@@ -354,24 +363,11 @@ export function useAgentVine() {
     }
   };
 
-  const trackInteraction = async (offerId: number, type: 'impression' | 'click') => {
-    try {
-      if (type === 'impression') {
-        await sdk.trackImpression({ offerId, sessionId: 'current' });
-      } else {
-        await sdk.trackClick({ offerId, sessionId: 'current' });
-      }
-    } catch (err) {
-      console.error('Tracking error:', err);
-    }
-  };
-
   return {
     offers: readonly(offers),
     loading: readonly(loading),
     error: readonly(error),
-    getOffers,
-    trackInteraction
+    getOffers
   };
 }
 ```
@@ -380,18 +376,18 @@ export function useAgentVine() {
 
 ```typescript
 import { Client, GatewayIntentBits } from 'discord.js';
-import { AgentVineSDK } from '@agentvine/sdk';
+import { AgentVineClient } from 'agentvine';
 
-const client = new Client({ 
+const discordClient = new Client({ 
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] 
 });
 
-const sdk = new AgentVineSDK({
-  apiKey: process.env.AGENTVINE_API_KEY!,
-  secretKey: process.env.AGENTVINE_SECRET_KEY!
+const agentVineClient = new AgentVineClient({
+  agentId: process.env.AGENTVINE_AGENT_ID!,
+  agentSecretKey: process.env.AGENTVINE_SECRET_KEY!
 });
 
-client.on('messageCreate', async (message) => {
+discordClient.on('messageCreate', async (message) => {
   if (message.author.bot) return;
   
   // Trigger on specific commands or keywords
@@ -401,14 +397,10 @@ client.on('messageCreate', async (message) => {
     const sessionId = `discord-${message.author.id}-${Date.now()}`;
     
     try {
-      const response = await sdk.getOffers({
+      const response = await agentVineClient.getOffers({
         query: message.content,
         sessionId,
-        context: {
-          platform: 'discord',
-          guildId: message.guildId,
-          channelType: message.channel.type
-        }
+        context: `discord platform, guild: ${message.guildId}`
       });
 
       if (response.offers.length > 0) {
@@ -422,19 +414,12 @@ client.on('messageCreate', async (message) => {
           fields: [
             {
               name: '🔗 Get Started',
-              value: `[${offer.callToAction}](${offer.actionUrl})`
+              value: `[${offer.callToAction}](${offer.actionEndpoint})`
             }
           ]
         };
 
         await message.reply({ embeds: [embed] });
-        
-        // Track impression
-        await sdk.trackImpression({
-          offerId: offer.id,
-          sessionId,
-          placement: 'discord_message'
-        });
       }
     } catch (error) {
       console.error('Discord bot AgentVine error:', error);
@@ -442,7 +427,7 @@ client.on('messageCreate', async (message) => {
   }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+discordClient.login(process.env.DISCORD_TOKEN);
 ```
 
 ## Error Handling
@@ -492,10 +477,10 @@ const response: OfferResponse = await client.getOffers(request);
 
 ## Security & Privacy
 
-- **Automatic Tracking**: User impressions and clicks are tracked automatically by AgentVine when offers are displayed and interacted with
-- **No Manual Reporting**: The SDK does not expose manual impression tracking to prevent fraud
 - **Secure Communication**: All API calls use HTTPS and authenticated requests
 - **Privacy First**: No personal user data is sent to AgentVine - only query content and session IDs
+- **Background Health Monitoring**: Silent connection verification every 30 seconds
+- **Connection Status Tracking**: Real-time monitoring of agent connectivity
 
 ## 🔧 Configuration Options
 
@@ -503,166 +488,63 @@ const response: OfferResponse = await client.getOffers(request);
 
 ```typescript
 // Production environment (default)
-const sdk = new AgentVineClient({
+const client = new AgentVineClient({
   agentId: 'your_agent_id',
   agentSecretKey: 'your_secret_key',
   environment: 'production' // Uses https://api.agentvine.dev
 });
 
 // Development environment
-const devSdk = new AgentVineClient({
+const devClient = new AgentVineClient({
   agentId: 'your_agent_id',
   agentSecretKey: 'your_secret_key',
   environment: 'development' // Uses https://dev-api.agentvine.dev
 });
 
 // Local development
-const localSdk = new AgentVineClient({
+const localClient = new AgentVineClient({
   agentId: 'your_agent_id',
   agentSecretKey: 'your_secret_key',
   environment: 'local' // Uses http://localhost:3001
 });
 
-// Custom base URL (overrides environment)
-const customSdk = new AgentVineClient({
+// With connection callbacks
+const monitoredClient = new AgentVineClient({
   agentId: 'your_agent_id',
   agentSecretKey: 'your_secret_key',
-  baseUrl: 'https://your-custom-api.example.com',
-  timeout: 15000 // Custom timeout
-});
-```
-
-### Agent Configuration
-
-```typescript
-// Configure agent behavior via dashboard or API
-const agentConfig = {
-  // Targeting preferences
-  targeting: {
-    categories: ['saas', 'development-tools', 'productivity'],
-    priceRange: { min: 0, max: 100 },
-    audienceTypes: ['developers', 'startups']
+  timeout: 15000,
+  onConnectionVerified: (agent) => {
+    console.log('Connected as:', agent.name);
   },
-  
-  // Performance settings
-  performance: {
-    maxOffersPerQuery: 3,
-    relevanceThreshold: 0.7,
-    diversityMode: true
+  onConnectionFailed: (error) => {
+    console.error('Connection failed:', error.message);
+  }
+});
+```
+
+### Connection Management
+
+```typescript
+// Monitor connection status
+const client = new AgentVineClient({
+  agentId: 'your_agent_id',
+  agentSecretKey: 'your_secret_key',
+  onConnectionVerified: (agent) => {
+    console.log(`✅ Connected as: ${agent.name}`);
   },
-  
-  // Revenue optimization
-  monetization: {
-    revenueModel: 'cpc', // 'cpc' | 'cpm' | 'hybrid'
-    minimumBid: 0.10,
-    qualityScore: 'high'
-  }
-};
-```
-
-## 📊 Analytics and Tracking
-
-### Built-in Analytics
-
-```typescript
-// Get agent performance metrics
-const analytics = await sdk.getAnalytics({
-  timeRange: '30d', // '24h' | '7d' | '30d' | '90d'
-  metrics: ['impressions', 'clicks', 'revenue', 'ctr'],
-  groupBy: 'day' // 'hour' | 'day' | 'week'
-});
-
-console.log('Performance Summary:', {
-  totalRevenue: analytics.revenue.total,
-  clickThroughRate: analytics.ctr.average,
-  topOffers: analytics.topPerforming
-});
-```
-
-### Custom Event Tracking
-
-```typescript
-// Track custom conversion events
-await sdk.trackConversion({
-  offerId: 123,
-  sessionId: 'session-456',
-  conversionType: 'signup', // 'purchase' | 'signup' | 'trial'
-  value: 29.99, // Optional: conversion value
-  metadata: {
-    source: 'chat_recommendation',
-    userType: 'premium'
+  onConnectionFailed: (error) => {
+    console.error(`❌ Connection failed: ${error.message}`);
   }
 });
 
-// Track user engagement
-await sdk.trackEngagement({
-  sessionId: 'session-456',
-  event: 'offer_viewed',
-  duration: 15000, // Time spent viewing offer (ms)
-  interaction: 'hover' // 'click' | 'hover' | 'scroll'
-});
-```
+// Check connection status anytime
+const status = client.getConnectionStatus();
+console.log('Connected:', status.isConnected);
+console.log('Agent:', status.agent?.name);
+console.log('Error:', status.error?.message);
 
-## 🚀 Advanced Features
-
-### Batch Operations
-
-```typescript
-// Batch multiple requests for efficiency
-const batchRequests = [
-  { query: 'project management', sessionId: 'session-1' },
-  { query: 'code editor', sessionId: 'session-2' },
-  { query: 'design tools', sessionId: 'session-3' }
-];
-
-const batchResults = await sdk.batchGetOffers(batchRequests);
-batchResults.forEach((result, index) => {
-  console.log(`Query ${index + 1}:`, result.offers.length, 'offers');
-});
-```
-
-### Caching and Performance
-
-```typescript
-// Configure intelligent caching
-const cachedSdk = new AgentVineSDK({
-  apiKey: 'your_key',
-  secretKey: 'your_secret',
-  
-  // Cache configuration
-  cache: {
-    enabled: true,
-    ttl: 300, // Cache TTL in seconds
-    maxSize: 1000, // Maximum cached items
-    strategy: 'lru' // 'lru' | 'lfu' | 'fifo'
-  }
-});
-
-// Use with cache-aware methods
-const offers = await cachedSdk.getOffers({
-  query: 'productivity tools',
-  sessionId: 'session-123',
-  useCache: true // Explicitly enable cache for this request
-});
-```
-
-### Real-time Features
-
-```typescript
-// Subscribe to real-time offer updates
-const subscription = sdk.subscribeToOffers({
-  categories: ['development'],
-  onUpdate: (offers) => {
-    console.log('New offers available:', offers.length);
-    updateUI(offers);
-  },
-  onError: (error) => {
-    console.error('Subscription error:', error);
-  }
-});
-
-// Cleanup subscription
-subscription.unsubscribe();
+// Cleanup when done
+client.destroy();
 ```
 
 ## 🛡 Security Best Practices
@@ -671,15 +553,15 @@ subscription.unsubscribe();
 
 ```typescript
 // ✅ Secure API key storage
-const sdk = new AgentVineSDK({
-  apiKey: process.env.AGENTVINE_API_KEY,
-  secretKey: process.env.AGENTVINE_SECRET_KEY
+const client = new AgentVineClient({
+  agentId: process.env.AGENTVINE_AGENT_ID,
+  agentSecretKey: process.env.AGENTVINE_SECRET_KEY
 });
 
 // ❌ Never hardcode keys
-const badSdk = new AgentVineSDK({
-  apiKey: 'ak_1234567890abcdef', // Don't do this!
-  secretKey: 'sk_abcdef1234567890'
+const badClient = new AgentVineClient({
+  agentId: 'agent_1234567890abcdef', // Don't do this!
+  agentSecretKey: 'sk_abcdef1234567890'
 });
 ```
 
@@ -703,7 +585,7 @@ function isValidSessionId(sessionId: string): boolean {
 const safeQuery = sanitizeQuery(userInput);
 const safeSessionId = isValidSessionId(sessionId) ? sessionId : generateSessionId();
 
-const offers = await sdk.getOffers({
+const offers = await client.getOffers({
   query: safeQuery,
   sessionId: safeSessionId
 });
@@ -715,18 +597,10 @@ const offers = await sdk.getOffers({
 - **[Developer Portal](https://developers.agentvine.com)** - Complete API documentation
 - **[Dashboard](https://dashboard.agentvine.com)** - Agent management and analytics
 - **[Getting Started Guide](https://docs.agentvine.com/quickstart)** - Step-by-step setup
-- **[Best Practices](https://docs.agentvine.com/best-practices)** - Optimization tips
 
 ### Community and Support
-- **[GitHub Issues](https://github.com/agentvine/sdk/issues)** - Bug reports and feature requests
-- **[Discord Community](https://discord.gg/agentvine)** - Developer community chat
-- **[Stack Overflow](https://stackoverflow.com/questions/tagged/agentvine)** - Q&A and troubleshooting
-- **[Developer Blog](https://blog.agentvine.com)** - Updates and technical articles
-
-### Migration and Upgrade Guides
-- **[v1 to v2 Migration](https://docs.agentvine.com/migration/v2)** - Breaking changes and updates
-- **[Changelog](https://github.com/agentvine/sdk/releases)** - Version history and updates
-- **[Deprecation Schedule](https://docs.agentvine.com/deprecation)** - Planned API changes
+- **[GitHub Issues](https://github.com/rishirebel/agentvine/issues)** - Bug reports and feature requests
+- **[npm Package](https://www.npmjs.com/package/agentvine)** - Latest releases
 
 ## 📄 License
 
